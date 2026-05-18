@@ -8,6 +8,16 @@ function srandom() {
 }
 function setSeed(s) { seed = s; }
 
+function randomNormal(mean = 0, std = 1) {
+  let u1 = 0;
+  let u2 = 0;
+  while (u1 === 0) u1 = srandom();
+  while (u2 === 0) u2 = srandom();
+  const mag = Math.sqrt(-2.0 * Math.log(u1));
+  const z0 = mag * Math.cos(2.0 * Math.PI * u2);
+  return mean + std * z0;
+}
+
 class Module {
   parameters() {
     const params = [];
@@ -35,7 +45,7 @@ class Linear extends Module {
     const std = 0.08;
     const weightData = new Float32Array(in_features * out_features);
     for (let i = 0; i < weightData.length; i++) {
-      weightData[i] = (srandom() - 0.5) * 2 * std;
+      weightData[i] = randomNormal(0, std);
     }
     this.weight = new Tensor(ndarray(weightData, [in_features, out_features]), [], true);
 
@@ -61,7 +71,7 @@ class Embedding extends Module {
     super();
     const weightData = new Float32Array(num_embeddings * embedding_dim);
     for (let i = 0; i < weightData.length; i++) {
-      weightData[i] = (srandom() - 0.5) * 2 * 0.08;
+      weightData[i] = randomNormal(0, 0.08);
     }
     this.weight = new Tensor(ndarray(weightData, [num_embeddings, embedding_dim]), [], true);
   }
