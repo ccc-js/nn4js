@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>nn4js - Neural Network Framework for JavaScript</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f0f1a; color: #e0e0e0; min-height: 100vh; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+    h1 { font-size: 2.5rem; color: #00d4ff; margin-bottom: 0.5rem; }
+    .subtitle { color: #888; margin-bottom: 2rem; font-size: 1.1rem; }
+    .demo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem; }
+    .demo-card { background: #1a1a2e; border-radius: 12px; padding: 1.5rem; border: 1px solid #2a2a4a; }
+    .demo-card h2 { color: #00d4ff; margin-bottom: 1rem; font-size: 1.3rem; }
+    .demo-card p { color: #aaa; margin-bottom: 1rem; font-size: 0.9rem; line-height: 1.5; }
+    button { background: #00d4ff; color: #0f0f1a; border: none; padding: 0.6rem 1.2rem; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s; }
+    button:hover { background: #00b8e6; transform: translateY(-1px); }
+    button:disabled { background: #444; cursor: not-allowed; }
+    .output { background: #0f0f1a; padding: 1rem; border-radius: 6px; margin-top: 1rem; font-family: 'Fira Code', monospace; font-size: 0.85rem; max-height: 300px; overflow-y: auto; white-space: pre-wrap; color: #7fdb7f; }
+    .output.error { color: #ff6b6b; }
+    .progress { margin-top: 0.5rem; height: 4px; background: #2a2a4a; border-radius: 2px; overflow: hidden; }
+    .progress-bar { height: 100%; background: #00d4ff; transition: width 0.3s; width: 0%; }
+    canvas { background: #0f0f1a; border-radius: 6px; margin-top: 1rem; }
+    input { width: 100%; padding: 0.5rem; background: #0f0f1a; border: 1px solid #2a2a4a; border-radius: 4px; color: #e0e0e0; margin-bottom: 1rem; }
+    .xor-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; margin: 1rem 0; }
+    .xor-cell { padding: 1rem; background: #2a2a4a; border-radius: 4px; text-align: center; font-family: monospace; }
+    .xor-cell.predicted-true { background: #00d4ff33; border: 1px solid #00d4ff; }
+    .xor-cell.predicted-false { background: #ff6b6b33; border: 1px solid #ff6b6b; }
+    footer { text-align: center; padding: 2rem; color: #666; font-size: 0.85rem; margin-top: 2rem; border-top: 1px solid #2a2a4a; }
+    a { color: #00d4ff; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>nn4js</h1>
+    <p class="subtitle">Neural Network Framework for JavaScript (with GPT) - Pure browser implementation</p>
+
+    <div class="demo-grid">
+      <div class="demo-card">
+        <h2>Linear Regression</h2>
+        <p>Learn the relationship y = 2x + 1 with noise. The simplest neural network: one linear layer with MSE loss.</p>
+        <button id="runLinear">Train Linear Regression</button>
+        <div class="progress"><div class="progress-bar" id="linearProgress"></div></div>
+        <canvas id="linearCanvas" width="300" height="200"></canvas>
+        <div class="output" id="linearOutput">Click "Train Linear Regression" to start...</div>
+      </div>
+
+      <div class="demo-card">
+        <h2>XOR Problem</h2>
+        <p>Classic neural network problem: learn the XOR logic gate. A single hidden layer network can solve this non-linear problem.</p>
+        <button id="runXor">Run XOR Training</button>
+        <div class="progress"><div class="progress-bar" id="xorProgress"></div></div>
+        <div class="xor-grid" id="xorGrid"></div>
+        <div class="output" id="xorOutput">Click "Run XOR Training" to start...</div>
+      </div>
+
+      <div class="demo-card">
+        <h2>CharGPT - Chinese Name Generator</h2>
+        <p>Train a character-level GPT on Chinese sentences. Uses the same train_model/generate_samples as main.js.</p>
+        <label>Training steps:</label>
+        <input type="number" id="gptSteps" value="200" min="50" max="500">
+        <button id="runGpt">Train CharGPT</button>
+        <div class="progress"><div class="progress-bar" id="gptProgress"></div></div>
+        <div class="output" id="gptOutput">Click "Train CharGPT" to start...</div>
+      </div>
+    </div>
+
+    <footer>
+      <p>Built with <a href="https://github.com/cccnqu/n4js">nn4js</a> - A Neural Network Framework for JavaScript</p>
+    </footer>
+  </div>
+
+  <script src="nn4js.js"></script>
+  <script>
+    const { Tensor } = nn4js;
+    const { Linear, Module, Adam, setSeed } = nn4js;
+    const { GPT, train_model, generate_samples } = nn4js;
+
+    async function sleep(ms) {
+      return new Promise(r => setTimeout(r, ms));
+    }
+
+    const linearOutput = document.getElementById('linearOutput');
+    const linearProgress = document.getElementById('linearProgress');
+    const linearCanvas = document.getElementById('linearCanvas');
+    const lctx = linearCanvas.getContext('2d');
+
+    function drawLinearPlot(xData, yData, w, b) {
+      lctx.fillStyle = '#0f0f1a';
+      lctx.fillRect(0, 0, linearCanvas.width, linearCanvas.height);
+      const padding = 30;
+      const plotW = linearCanvas.width - padding * 2;
+      const plotH = linearCanvas.height - padding * 2;
+      const xMin = -1, xMax = 5;
+      const yMin = -3, yMax = 13;
+
+      const toX = (x) => padding + ((x - xMin) / (xMax - xMin)) * plotW;
+      const toY = (y) => padding + ((yMax - y) / (yMax - yMin)) * plotH;
+
+      lctx.strokeStyle = '#2a2a4a';
+      lctx.lineWidth = 1;
+      for (let i = 0; i <= 5; i++) {
+        lctx.beginPath();
+        lctx.moveTo(toX(i), padding);
+        lctx.lineTo(toX(i), linearCanvas.height - padding);
+        lctx.stroke();
+        lctx.beginPath();
+        lctx.moveTo(padding, toY(i * 2));
+        lctx.lineTo(linearCanvas.width - padding, toY(i * 2));
+        lctx.stroke();
+      }
+
+      lctx.strokeStyle = '#ff6b6b';
+      lctx.lineWidth = 2;
+      lctx.beginPath();
+      lctx.moveTo(toX(xMin), toY(w * xMin + b));
+      lctx.lineTo(toX(xMax), toY(w * xMax + b));
+      lctx.stroke();
+
+      lctx.fillStyle = '#00d4ff';
+      for (let i = 0; i < xData.length; i++) {
+        lctx.beginPath();
+        lctx.arc(toX(xData[i]), toY(yData[i]), 5, 0, Math.PI * 2);
+        lctx.fill();
+      }
+
+      lctx.fillStyle = '#888';
+      lctx.font = '12px sans-serif';
+      lctx.fillText('x', linearCanvas.width - 15, linearCanvas.height - 35);
+      lctx.fillText('y', 10, padding - 10);
+    }
+
+    async function runLinearRegression() {
+      linearOutput.textContent = 'Initializing...';
+      linearOutput.classList.remove('error');
+
+      setSeed(42);
+
+      class LinearReg extends Module {
+        constructor() {
+          super();
+          this.linear = new Linear(1, 1, true);
+        }
+        __call__(x) {
+          return this.linear.__call__(x);
+        }
+      }
+
+      const model = new LinearReg();
+      const optimizer = new Adam(model.parameters(), 0.1);
+
+      const trueW = 2, trueB = 1;
+      const nSamples = 30;
+      const xData = [], yData = [];
+
+      for (let i = 0; i < nSamples; i++) {
+        const x = Math.random() * 5;
+        const y = trueW * x + trueB + (Math.random() - 0.5) * 2;
+        xData.push(x);
+        yData.push(y);
+      }
+
+      drawLinearPlot(xData, yData, 0, 0);
+
+      for (let step = 0; step < 50; step++) {
+        for (let i = 0; i < nSamples; i++) {
+          const x = new Tensor([[xData[i]]], [], true);
+          const y = new Tensor([[yData[i]]], [], false);
+
+          optimizer.zero_grad();
+          const pred = model.__call__(x);
+          const loss = pred.add(y.mul(-1)).mul(pred.add(y.mul(-1)));
+          loss.backward();
+          optimizer.step();
+        }
+
+        if (step % 10 === 0) {
+          const w = model.linear.weight.data.data[0];
+          const b = model.linear.bias.data.data[0];
+          linearOutput.textContent = `Step ${step}/50\ny = ${w.toFixed(3)}x + ${b.toFixed(3)}\n(True: y = 2x + 1)`;
+          linearProgress.style.width = `${(step / 50) * 100}%`;
+          drawLinearPlot(xData, yData, w, b);
+          await sleep(20);
+        }
+      }
+
+      const w = model.linear.weight.data.data[0];
+      const b = model.linear.bias.data.data[0];
+      linearOutput.textContent = `Training complete!\n\nLearned: y = ${w.toFixed(3)}x + ${b.toFixed(3)}\nTrue: y = 2x + 1`;
+      linearProgress.style.width = '100%';
+      drawLinearPlot(xData, yData, w, b);
+    }
+
+    document.getElementById('runLinear').onclick = () => {
+      document.getElementById('runLinear').disabled = true;
+      linearOutput.textContent = 'Training...';
+      linearOutput.classList.remove('error');
+      runLinearRegression().then(() => {
+        document.getElementById('runLinear').disabled = false;
+      }).catch(e => {
+        linearOutput.textContent = 'Error: ' + e.message;
+        linearOutput.classList.add('error');
+        document.getElementById('runLinear').disabled = false;
+      });
+    };
+
+    const xorOutput = document.getElementById('xorOutput');
+    const xorGrid = document.getElementById('xorGrid');
+    const xorProgress = document.getElementById('xorProgress');
+
+    async function runXOR() {
+      xorOutput.textContent = 'Initializing network...';
+      xorOutput.classList.remove('error');
+
+      setSeed(42);
+
+      class XORNet extends Module {
+        constructor() {
+          super();
+          this.fc1 = new Linear(2, 8);
+          this.fc2 = new Linear(8, 1);
+        }
+        __call__(x) {
+          let out = this.fc1.__call__(x).relu();
+          out = this.fc2.__call__(out);
+          return out;
+        }
+      }
+
+      const model = new XORNet();
+      const optimizer = new Adam(model.parameters(), 0.1);
+
+      const xorData = [
+        [[[0, 0]], [[0]]],
+        [[[0, 1]], [[1]]],
+        [[[1, 0]], [[1]]],
+        [[[1, 1]], [[0]]]
+      ];
+
+      for (let step = 0; step < 200; step++) {
+        for (const [x_data, y_data] of xorData) {
+          const x = new Tensor(x_data, [], true);
+          const y = new Tensor(y_data, [], false);
+
+          optimizer.zero_grad();
+          const pred = model.__call__(x);
+          const loss = pred.add(y.mul(-1)).mul(pred.add(y.mul(-1)));
+          loss.backward();
+          optimizer.step();
+        }
+
+        if (step % 40 === 0) {
+          xorOutput.textContent = `Step ${step}/200\nTraining...`;
+          xorProgress.style.width = `${(step / 200) * 100}%`;
+          await sleep(10);
+        }
+      }
+
+      xorOutput.textContent = 'Training complete!\n\nPredictions:';
+
+      xorGrid.innerHTML = '';
+      for (const [x_data, y_data] of xorData) {
+        const x = new Tensor(x_data, [], false);
+        const pred = model.__call__(x);
+        const predVal = pred.data.data[0] > 0.5 ? 1 : 0;
+        const expected = y_data[0][0];
+        xorOutput.textContent += `\n${x_data[0][0]} XOR ${x_data[0][1]} = ${predVal} (expected ${expected})`;
+
+        const cell = document.createElement('div');
+        cell.className = `xor-cell ${predVal === expected ? 'predicted-true' : 'predicted-false'}`;
+        cell.textContent = `${x_data[0][0]} xor ${x_data[0][1]} = ${predVal}`;
+        xorGrid.appendChild(cell);
+      }
+
+      xorProgress.style.width = '100%';
+    }
+
+    document.getElementById('runXor').onclick = () => {
+      document.getElementById('runXor').disabled = true;
+      xorOutput.textContent = 'Training...';
+      xorOutput.classList.remove('error');
+      runXOR().then(() => {
+        document.getElementById('runXor').disabled = false;
+      }).catch(e => {
+        xorOutput.textContent = 'Error: ' + e.message;
+        xorOutput.classList.add('error');
+        document.getElementById('runXor').disabled = false;
+      });
+    };
+
+    const gptOutput = document.getElementById('gptOutput');
+    const gptProgress = document.getElementById('gptProgress');
+
+    async function runCharGPT() {
+      const steps = parseInt(document.getElementById('gptSteps').value) || 200;
+      gptOutput.textContent = 'Initializing CharGPT...';
+      gptOutput.classList.remove('error');
+
+      setSeed(42);
+
+      const docs = [
+        '小貓', '小狗', '小鳥', '小魚',
+        '大貓', '大狗', '大鳥', '大魚',
+        '張三', '李四', '王五', '陳六',
+        '天上有白雲', '山上有大樹', '水中有小魚'
+      ];
+
+      const uchars = [...new Set(docs.join(''))].sort();
+      const BOS = uchars.length;
+      const vocab_size = uchars.length + 1;
+      const block_size = 16;
+
+      const model = new GPT(vocab_size, block_size, 2, 32, 4);
+      const optimizer = new Adam(model.parameters(), 0.01);
+
+      gptOutput.textContent = `Training on ${docs.length} samples...\nVocab: ${vocab_size} chars\n\n`;
+
+      train_model(model, optimizer, docs, uchars, BOS, block_size, steps);
+
+      gptOutput.textContent += '\n--- inference ---\n';
+
+      const results = generate_samples(model, uchars, BOS, vocab_size, block_size, 10, 0.5);
+      results.forEach(name => {
+        gptOutput.textContent += name + '\n';
+      });
+
+      gptProgress.style.width = '100%';
+    }
+
+    document.getElementById('runGpt').onclick = () => {
+      document.getElementById('runGpt').disabled = true;
+      gptOutput.textContent = 'Training...';
+      gptOutput.classList.remove('error');
+      runCharGPT().then(() => {
+        document.getElementById('runGpt').disabled = false;
+      }).catch(e => {
+        gptOutput.textContent = 'Error: ' + e.message;
+        gptOutput.classList.add('error');
+        document.getElementById('runGpt').disabled = false;
+      });
+    };
+  </script>
+</body>
+</html>

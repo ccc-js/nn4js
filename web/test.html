@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head><title>Test</title></head>
+<body>
+<pre id="output">Loading...</pre>
+<script src="nn4js.js"></script>
+<script>
+const output = document.getElementById('output');
+
+try {
+  output.textContent = 'nn4js: ' + typeof nn4js + '\n';
+  output.textContent += 'Tensor: ' + typeof nn4js.Tensor + '\n';
+  output.textContent += 'Linear: ' + typeof nn4js.Linear + '\n';
+  output.textContent += 'Module: ' + typeof nn4js.Module + '\n';
+  output.textContent += 'Adam: ' + typeof nn4js.Adam + '\n';
+  output.textContent += 'setSeed: ' + typeof nn4js.setSeed + '\n';
+
+  const { Tensor, Linear, Module, Adam, setSeed } = nn4js;
+
+  output.textContent += '\nDestructured successfully\n';
+
+  setSeed(42);
+
+  // Simple test: create tensor and check data
+  const t = new Tensor([[1, 2], [3, 4]]);
+  output.textContent += '\nTensor shape: ' + JSON.stringify(t.data.shape) + '\n';
+  output.textContent += 'Tensor data: ' + Array.from(t.data.data) + '\n';
+
+  // Test Linear layer
+  const linear = new Linear(2, 1);
+  const x = new Tensor([[1, 0]]);
+  const y = linear.__call__(x);
+  output.textContent += '\nLinear output shape: ' + JSON.stringify(y.data.shape) + '\n';
+  output.textContent += 'Linear output: ' + y.data.data[0] + '\n';
+
+  output.textContent += '\nAll tests passed!';
+} catch (e) {
+  output.textContent = 'Error: ' + e.message + '\n' + e.stack;
+}
+</script>
+</body>
+</html>

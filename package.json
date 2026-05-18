@@ -16,6 +16,7 @@
     "ndarray": "^1.0.19"
   },
   "devDependencies": {
+    "esbuild": "^0.28.0",
     "eslint": "^10.4.0",
     "jest": "^30.4.2",
     "prettier": "^3.8.3"
